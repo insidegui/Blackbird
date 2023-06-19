@@ -64,7 +64,9 @@ extension Blackbird {
 
     internal struct PerformanceLogger: @unchecked Sendable /* waiting for Sendable compliance in OSLog components */ {
         let log: Logger // The logger object. Exposed so it can be used directly.
-        let post: OSSignposter // The signposter object. Exposed so it can be used directly.
+        @available(macOS 12.0, *)
+        private var post: OSSignposter { _post as! OSSignposter }
+        private let _post: Any? // The signposter object. Exposed so it can be used directly.
 
         // Enum of all signposts. Signpost IDs will be generate automatically.
         enum Signpost: CaseIterable {
@@ -79,11 +81,15 @@ extension Blackbird {
         
         init(subsystem: String, category: String) {
             log = Logger(subsystem: subsystem, category: category)
-            post = OSSignposter(subsystem: subsystem, category: category)
             // Populate our signpost enum to signpost id table.
             spidMap = [:]
-            for sp in Signpost.allCases {
-                spidMap[sp] = post.makeSignpostID()
+            if #available(macOS 12.0, *) {
+                _post = OSSignposter(subsystem: subsystem, category: category)
+                for sp in Signpost.allCases {
+                    spidMap[sp] = post.makeSignpostID()
+                }
+            } else {
+                _post = nil
             }
         }
 
@@ -105,8 +111,14 @@ extension Blackbird {
         /// // ... do work here ...
         /// perfLogger.end(state: signpostState)
         /// ```
+        @available(macOS 12.0, *)
         func begin(signpost: Signpost, message: String = "", name: StaticString = #function) -> OSSignpostIntervalState {
             return post.beginInterval(name, id: spidMap[signpost]!, "\(message)")
+        }
+
+        @_disfavoredOverload
+        func begin(signpost: Signpost, message: String = "", name: StaticString = #function) -> Any? {
+            return nil
         }
 
         /// Ends a measured time interval
@@ -122,9 +134,13 @@ extension Blackbird {
         /// perfLogger.end(state: signpostState, name: "MySignpost")
         /// perfLogger.end(state: signpostState)
         /// ```
+        @available(macOS 12.0, *)
         func end(state: OSSignpostIntervalState, name: StaticString = #function) {
             post.endInterval(name, state)
         }
+
+        @_disfavoredOverload
+        func end(state: Any?, name: StaticString = #function) { }
 
         // When using the signposter directly this will return the appropriate OSSignpostID
         /// Get an `OSSignpostID` for a given `PerformanceLogger.Signpost`
@@ -137,6 +153,7 @@ extension Blackbird {
         /// ```swift
         /// let spid = perLogger.signpostId(for: .execute)
         /// ```
+        @available(macOS 12.0, *)
         func signpostId(for sp: Signpost) -> OSSignpostID {
             // Force unwrap because if we don't have a match we're in big trouble and should crash.
             return spidMap[sp]!

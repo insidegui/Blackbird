@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "Blackbird",
     platforms: [
-        .macOS(.v12),
+        .macOS(.v11),
         .iOS(.v15),
         .watchOS(.v8),
         .tvOS(.v15),
